@@ -16,4 +16,8 @@ const sendResponse = function (
   return res.status(statusCode).json(obj);
 };
 
-export { sendResponse };
+const sendErrorResponse = (res, message, statusCode = 500) => {
+    sendResponse(res, false, null, message, statusCode);
+};
+
+export { sendResponse,sendErrorResponse };

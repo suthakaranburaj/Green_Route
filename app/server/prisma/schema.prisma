@@ -12,42 +12,72 @@ datasource db {
   directUrl= env("DIRECT_DATABASE_URL")
 }
 
-model RouteOptimization {
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  company   String?
+  password  String   // Add this field for authentication
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relationships
+  routes    Route[]
+  orders    Order[]
+  
+  @@map("users")
+}
+
+model Route {
   id          String   @id @default(cuid())
   userId      String
   originLat   Float
   originLng   Float
   destLat     Float
   destLng     Float
-  vehicleType VehicleType
-  shiftLength Int      // in hours
-  packageWeight Float  // in kg
-  trafficData  Json?   // stored traffic information
-  optimalRoute Json    // optimized route data
-  fuelSavings  Float   // percentage saved
-  totalDistance Float  // in km
-  estimatedFuelCost Float
+  packageWeight Float
+  riderShiftLength Int
+  trafficLevel String // low, medium, high
+  vehicleType String // petrol, ev, mixed
+  
+  // Optimized route data
+  optimizedPath   Json?
+  fuelSavings     Float?
+  distance       Float?
+  estimatedTime  Int?
   riderSwapPoints Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([userId])
-  @@index([createdAt])
-}
-
-enum VehicleType {
-  PETROL
-  ELECTRIC
-}
-
-model CachedRoute {
-  id        String   @id @default(cuid())
-  originKey String   // hash of origin coords
-  destKey   String   // hash of dest coords
-  routeData Json
+  carbonReduction Float?
+  
   createdAt DateTime @default(now())
-  expiresAt DateTime
+  
+  // Relationships
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders    Order[]
+  
+  @@map("routes")
+}
 
-  @@unique([originKey, destKey])
-  @@index([expiresAt])
+model Order {
+  id          String   @id @default(cuid())
+  routeId     String
+  userId      String
+  orderData   Json?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  
+  // Relationships
+  route Route @relation(fields: [routeId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+  
+  @@map("orders")
+}
+
+model Cache {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@map("cache")
 }

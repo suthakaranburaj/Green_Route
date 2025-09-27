@@ -1,57 +1,72 @@
-import { sendResponse } from "../utils/apiResonse.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
-import { statusType } from "../utils/statusType.js";
-import prisma from "../db/index.js";
+import { PrismaClient } from "@prisma/client";
 
-export const verifyJWT = asyncHandler(async (req, res, next) => {
-    const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
+const prisma = new PrismaClient();
 
-    if (!token) {
-        return sendResponse(
-            res,
-            false,
-            null,
-            "Unauthorized request: Token missing",
-            statusType.UNAUTHORIZED
-        );
-    }
-
+/**
+ * Authentication middleware
+ */
+export const authenticate = async (req, res, next) => {
     try {
-        const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+        const token = req.header("Authorization")?.replace("Bearer ", "");
 
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Access denied. No token provided.",
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
+
+        // Check if user still exists
         const user = await prisma.user.findUnique({
-            where: { id: decodedToken.userId },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
-                createdAt: true,
-                updatedAt: true
-                // Exclude password and refresh_token
-            }
+            where: { id: decoded.userId },
+            select: { id: true, email: true, name: true }
         });
 
         if (!user) {
-            return sendResponse(
-                res,
-                false,
-                null,
-                "Unauthorized request: Invalid access token",
-                statusType.UNAUTHORIZED
-            );
+            return res.status(401).json({
+                success: false,
+                message: "Token is valid but user no longer exists.",
+                timestamp: new Date().toISOString()
+            });
         }
 
         req.user = user;
         next();
     } catch (error) {
-        return sendResponse(
-            res,
-            false,
-            null,
-            error?.message || "Unauthorized request: Token verification failed",
-            statusType.UNAUTHORIZED
-        );
+        return res.status(401).json({
+            success: false,
+            message: "Invalid token.",
+            timestamp: new Date().toISOString()
+        });
     }
-});
+};
+
+/**
+ * Optional authentication middleware (doesn't throw error if no token)
+ */
+export const optionalAuthenticate = async (req, res, next) => {
+    try {
+        const token = req.header("Authorization")?.replace("Bearer ", "");
+
+        if (token) {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
+            const user = await prisma.user.findUnique({
+                where: { id: decoded.userId },
+                select: { id: true, email: true, name: true }
+            });
+
+            if (user) {
+                req.user = user;
+            }
+        }
+
+        next();
+    } catch (error) {
+        // Continue without authentication if token is invalid
+        next();
+    }
+};
