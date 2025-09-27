@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")        
+  directUrl= env("DIRECT_DATABASE_URL")
+}
+
+model RouteOptimization {
+  id          String   @id @default(cuid())
+  userId      String
+  originLat   Float
+  originLng   Float
+  destLat     Float
+  destLng     Float
+  vehicleType VehicleType
+  shiftLength Int      // in hours
+  packageWeight Float  // in kg
+  trafficData  Json?   // stored traffic information
+  optimalRoute Json    // optimized route data
+  fuelSavings  Float   // percentage saved
+  totalDistance Float  // in km
+  estimatedFuelCost Float
+  riderSwapPoints Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum VehicleType {
+  PETROL
+  ELECTRIC
+}
+
+model CachedRoute {
+  id        String   @id @default(cuid())
+  originKey String   // hash of origin coords
+  destKey   String   // hash of dest coords
+  routeData Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@unique([originKey, destKey])
+  @@index([expiresAt])
+}
